@@ -15,8 +15,11 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Instalar dependencias
-        run: pip install requests
+      - name: Instalar Navegador y Dependencias
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps
 
       - name: Ejecutar Cazador
         run: python cazador.py
@@ -26,7 +29,7 @@ jobs:
           git config --global user.name "Daniel-Bot"
           git config --global user.email "bot@github.com"
           git add lista_fresca.m3u
-          git commit -m "Lista actualizada automáticamente" || exit 0
+          git commit -m "Lista actualizada con navegador real" || exit 0
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
