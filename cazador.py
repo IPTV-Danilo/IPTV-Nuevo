@@ -4,19 +4,20 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 # =========================
-# OBTENER PROXIES ARGENTINOS
+# PROXIES ARGENTINOS
 # =========================
 def obtener_proxies():
     url = "https://www.proxynova.com/proxy-server-list/country-ar/"
     headers = {"User-Agent": "Mozilla/5.0"}
 
+    proxies = []
+
     try:
         response = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
 
-        proxies = []
-
         filas = soup.select("table tbody tr")
+
         for fila in filas:
             try:
                 ip = fila.select_one("td:nth-child(1)").text.strip()
@@ -25,35 +26,22 @@ def obtener_proxies():
             except:
                 continue
 
-        return proxies
+    except Exception as e:
+        print("Error obteniendo proxies:", e)
 
-    except:
-        return []
+    return proxies
 
 
 # =========================
-# PROBAR PROXY
+# CAPTURA REAL (TEST + M3U8)
 # =========================
-def probar_proxy(proxy):
+def capturar_con_proxy(p, url, proxy):
     try:
-        requests.get(
-            "https://api.ipify.org",
-            proxies={"http": proxy, "https": proxy},
-            timeout=5
-        )
-        return True
-    except:
-        return False
+        print(f"🌐 Probando proxy: {proxy}")
 
-
-# =========================
-# CAPTURAR M3U8
-# =========================
-def capturar_link(p, url, proxy=None):
-    try:
         browser = p.chromium.launch(
             headless=True,
-            proxy={"server": proxy} if proxy else None,
+            proxy={"server": proxy},
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
@@ -67,17 +55,14 @@ def capturar_link(p, url, proxy=None):
 
         m3u8_links = []
 
-        # 🔥 capturar TODO el tráfico (iframes incluidos)
         context.on("response", lambda response: (
             m3u8_links.append(response.url)
             if ".m3u8" in response.url else None
         ))
 
-        print(f"🌐 Entrando a {url} (proxy={proxy})")
-
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-        # intentar activar video
+        # activar player
         try:
             page.click("video")
         except:
@@ -88,21 +73,23 @@ def capturar_link(p, url, proxy=None):
         except:
             pass
 
-        page.mouse.move(300, 300)
+        page.mouse.move(200, 200)
 
-        time.sleep(25)
+        time.sleep(20)
 
         browser.close()
 
-        # devolver último link válido
+        # devolver último válido
         for link in reversed(m3u8_links):
             if ".m3u8" in link and "token" in link:
+                print(f"✅ Proxy FUNCIONA: {proxy}")
                 return link
 
+        print(f"❌ Proxy no sirve para stream: {proxy}")
         return None
 
     except Exception as e:
-        print(f"Error capturando: {e}")
+        print(f"❌ Error proxy {proxy}: {e}")
         return None
 
 
@@ -115,48 +102,37 @@ def main():
         "ESPN Premium": "https://streamtpnew.com/global1.php?stream=espnpremium"
     }
 
-    print("🔍 Buscando proxies argentinos...")
     proxies = obtener_proxies()
 
-    print(f"Total proxies: {len(proxies)}")
+    print(f"🔍 Proxies encontrados: {len(proxies)}")
 
     with sync_playwright() as p:
-
-        proxy_valido = None
-
-        # probar proxies (máx 20)
-        for proxy in proxies[:20]:
-            print(f"Probando proxy {proxy}...")
-            if probar_proxy(proxy):
-                proxy_valido = proxy
-                print(f"✅ Proxy válido: {proxy}")
-                break
 
         with open("lista_fresca.m3u", "w") as f:
             f.write("#EXTM3U\n")
 
             for nombre, url in canales.items():
 
-                link = None
+                print(f"\n🎯 Buscando stream para {nombre}")
 
-                # 🔥 intentar con proxy
-                if proxy_valido:
-                    link = capturar_link(p, url, proxy_valido)
+                link_final = None
 
-                # 🔥 fallback SIN proxy (CLAVE)
-                if not link:
-                    print("⚠️ Fallback sin proxy...")
-                    link = capturar_link(p, url, None)
+                # 🔥 probar varios proxies (clave)
+                for proxy in proxies[:30]:
+                    link = capturar_con_proxy(p, url, proxy)
 
-                if link:
-                    f.write(f"#EXTINF:-1,{nombre}\n{link}\n")
+                    if link:
+                        link_final = link
+                        break
+
+                if link_final:
+                    f.write(f"#EXTINF:-1,{nombre}\n{link_final}\n")
                     print(f"✅ {nombre} OK")
                 else:
-                    print(f"❌ {nombre} no encontrado")
+                    print(f"❌ {nombre} no encontrado con proxies")
 
-    print("✅ Proceso terminado")
+    print("\n✅ PROCESO TERMINADO")
 
 
 if __name__ == "__main__":
     main()
-  
