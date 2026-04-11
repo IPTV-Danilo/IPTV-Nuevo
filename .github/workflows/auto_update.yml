@@ -1,0 +1,57 @@
+name: IPTV Automático Daniel
+on:
+  schedule:
+    - cron: '0 */4 * * *' # Corre cada 4 horas automáticamente
+  workflow_dispatch: # Permite que lo arranques vos cuando quieras
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Instalación de herramientas
+        run: sudo apt-get install -y jq
+
+      - name: Extracción de links con Proxy
+        run: |
+          API_KEY="${{ secrets.SCRAPERAPI_KEY }}"
+          
+          # Función para extraer links a través del proxy residencial
+          extraer() {
+            local target=$1
+            # Codificamos la URL para la API
+            local encoded_url=$(echo "$target" | jq -sRr @uri)
+            curl -s "http://api.scraperapi.com?api_key=$API_KEY&url=$encoded_url" | grep -oE "https?://[^\s'\"]+\.m3u8[^\s'\"]*" | head -n 1 | sed 's/\\//g'
+          }
+
+          echo "Buscando Fox Sports 2..."
+          FOX2=$(extraer "https://streamtpnew.com/global1.php?stream=fox2ar")
+          
+          echo "Buscando TNT Sports..."
+          TNT=$(extraer "https://streamtpnew.com/global1.php?stream=tntsports")
+          
+          echo "Buscando ESPN Premium..."
+          ESPN=$(extraer "https://streamtpnew.com/global1.php?stream=espnpremium")
+
+          # Generar archivo M3U
+          echo "#EXTM3U" > lista_fresca.m3u
+          echo "#EXTINF:-1, Fox Sports 2" >> lista_fresca.m3u
+          echo "$FOX2" >> lista_fresca.m3u
+          echo "#EXTINF:-1, TNT Sports" >> lista_fresca.m3u
+          echo "$TNT" >> lista_fresca.m3u
+          echo "#EXTINF:-1, ESPN Premium" >> lista_fresca.m3u
+          echo "$ESPN" >> lista_fresca.m3u
+          
+          echo "Verificación de contenido:"
+          cat lista_fresca.m3u
+
+      - name: Guardar cambios en GitHub
+        run: |
+          git config --global user.name "Daniel-Bot"
+          git config --global user.email "bot@github.com"
+          git add lista_fresca.m3u
+          git commit -m "Actualización automática: $(date)" || exit 0
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
