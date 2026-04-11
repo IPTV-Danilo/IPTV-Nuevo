@@ -1,0 +1,32 @@
+name: Actualizador Pro Daniel
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Ejecutar Cazador
+        run: python cazador.py
+
+      - name: Guardar cambios
+        run: |
+          git config --global user.name "Daniel-Bot"
+          git config --global user.email "bot@github.com"
+          git add lista_fresca.m3u
+          git commit -m "Lista actualizada automáticamente" || exit 0
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
