@@ -1,4 +1,5 @@
 name: Actualizador Pro Daniel
+
 on:
   schedule:
     - cron: '0 */4 * * *'
@@ -7,21 +8,23 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Clonar repo
+        uses: actions/checkout@v4
 
       - name: Configurar Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
-      - name: Instalar Navegador y Dependencias
+      - name: Instalar dependencias
         run: |
-          pip install playwright
+          pip install -r requirements.txt
           playwright install chromium
           playwright install-deps
 
-      - name: Ejecutar Cazador
+      - name: Ejecutar script
         run: python cazador.py
 
       - name: Guardar cambios
@@ -29,7 +32,5 @@ jobs:
           git config --global user.name "Daniel-Bot"
           git config --global user.email "bot@github.com"
           git add lista_fresca.m3u
-          git commit -m "Lista actualizada con navegador real" || exit 0
+          git commit -m "Lista actualizada automaticamente" || exit 0
           git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
