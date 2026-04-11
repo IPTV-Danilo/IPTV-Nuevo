@@ -1,8 +1,8 @@
-name: Actualizador Pro Daniel
+name: Proxy Argentina Auto
 
 on:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 */2 * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clonar repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar Python
+      - name: Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -21,16 +21,17 @@ jobs:
       - name: Instalar dependencias
         run: |
           pip install -r requirements.txt
+          playwright install
           playwright install chromium
           playwright install-deps
 
       - name: Ejecutar script
-        run: python cazador.py
+        run: python cazador.py || true
 
       - name: Guardar cambios
         run: |
           git config --global user.name "Daniel-Bot"
           git config --global user.email "bot@github.com"
           git add lista_fresca.m3u
-          git commit -m "Lista actualizada automaticamente" || exit 0
+          git diff --cached --quiet || git commit -m "Update lista proxies"
           git push
