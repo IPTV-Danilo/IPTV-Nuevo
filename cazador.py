@@ -1,115 +1,118 @@
 import time
-import random
+import requests
+from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
-PROXIES_AR = [
-    "181.209.79.130:4145",
-    "190.105.215.154:999",
-    "181.118.151.106:8080"
-]
+def obtener_proxies():
+    url = "https://www.proxynova.com/proxy-server-list/country-ar/"
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-def capturar_link(context, url):
-    page = context.new_page()
-    m3u8_url = None
+    response = requests.get(url, headers=headers, timeout=10)
+    soup = BeautifulSoup(response.text, "html.parser")
 
-    def handle_response(response):
-        nonlocal m3u8_url
+    proxies = []
+
+    filas = soup.select("table tbody tr")
+
+    for fila in filas:
         try:
-            if ".m3u8" in response.url:
-                print(f"🎯 Detectado: {response.url}")
-                m3u8_url = response.url
+            ip = fila.select_one("td:nth-child(1)").text.strip()
+            port = fila.select_one("td:nth-child(2)").text.strip()
+            proxies.append(f"http://{ip}:{port}")
         except:
-            pass
+            continue
 
-    page.on("response", handle_response)
+    return proxies
 
+
+def probar_proxy(proxy):
     try:
-        print(f"🔗 Entrando a: {url}")
-        page.goto(url, timeout=90000)
+        r = requests.get(
+            "https://api.ipify.org",
+            proxies={"http": proxy, "https": proxy},
+            timeout=5
+        )
+        return True
+    except:
+        return False
 
-        # 🔥 CLAVE: esperar a que cargue todo el JS
-        page.wait_for_timeout(20000)
 
-        # 🔥 CLAVE: intentar interacción (muchos players requieren click)
+def capturar_link(p, url, proxy):
+    try:
+        browser = p.chromium.launch(
+            headless=True,
+            proxy={"server": proxy},
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-blink-features=AutomationControlled"
+            ]
+        )
+
+        page = browser.new_page()
+        m3u8_links = []
+
+        def handle_response(response):
+            if ".m3u8" in response.url and "token" in response.url:
+                m3u8_links.append(response.url)
+
+        page.on("response", handle_response)
+
+        page.goto(url, wait_until="networkidle", timeout=60000)
+
         try:
-            page.mouse.click(300, 300)
-            print("🖱️ Click forzado en el player")
+            page.click("video")
         except:
             pass
 
-        # Espera extra para que dispare requests del video
-        page.wait_for_timeout(15000)
+        time.sleep(20)
+
+        page.close()
+        browser.close()
+
+        return m3u8_links[-1] if m3u8_links else None
 
     except Exception as e:
-        print(f"⚠️ Error: {e}")
-
-    finally:
-        page.close()
-
-    return m3u8_url
-
-
-def probar_con_proxy(proxy, canales):
-    print(f"\n🌐 Probando proxy: {proxy}")
-
-    with sync_playwright() as p:
-        try:
-            browser = p.chromium.launch(
-                headless=True,
-                proxy={"server": f"http://{proxy}"}
-            )
-
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"
-            )
-
-            resultados = {}
-
-            for nombre, url in canales.items():
-                print(f"\n🔍 Buscando {nombre}")
-                link = capturar_link(context, url)
-                resultados[nombre] = link
-
-            browser.close()
-            return resultados
-
-        except Exception as e:
-            print(f"🚫 Proxy muerto: {e}")
-            return None
+        print(f"Error con proxy {proxy}: {e}")
+        return None
 
 
 def main():
     canales = {
-        "Fox Sports 2": "https://streamtpnew.com/global1.php?stream=fox2ar",
-        "TNT Sports": "https://streamtpnew.com/global1.php?stream=tntsports",
-        "ESPN Premium": "https://streamtpnew.com/global1.php?stream=espnpremium"
+        "TNT Sports": "https://streamtpnew.com/global1.php?stream=tntsports"
     }
 
-    random.shuffle(PROXIES_AR)
+    print("🔍 Buscando proxies...")
+    proxies = obtener_proxies()
 
-    resultados_finales = None
+    print(f"Total proxies: {len(proxies)}")
 
-    for proxy in PROXIES_AR:
-        resultados = probar_con_proxy(proxy, canales)
+    with sync_playwright() as p:
+        proxy_valido = None
 
-        if resultados and any(resultados.values()):
-            print("✅ Proxy funcional encontrado")
-            resultados_finales = resultados
-            break
+        for proxy in proxies[:30]:
+            print(f"Probando {proxy}...")
+            if probar_proxy(proxy):
+                proxy_valido = proxy
+                print(f"✅ Proxy válido: {proxy}")
+                break
 
-    # Guardar archivo
-    with open("lista_fresca.m3u", "w") as f:
-        f.write("#EXTM3U\n")
+        if not proxy_valido:
+            print("❌ No se encontró proxy válido")
+            return
 
-        if resultados_finales:
-            for nombre, link in resultados_finales.items():
+        with open("lista_fresca.m3u", "w") as f:
+            f.write("#EXTM3U\n")
+
+            for nombre, url in canales.items():
+                link = capturar_link(p, url, proxy_valido)
+
                 if link:
                     f.write(f"#EXTINF:-1,{nombre}\n{link}\n")
-                    print(f"✅ {nombre} agregado")
+                    print(f"✅ {nombre}")
                 else:
-                    print(f"❌ {nombre} sin link")
-        else:
-            print("🚫 Ningún proxy funcionó")
+                    print(f"❌ {nombre}")
+
 
 if __name__ == "__main__":
     main()
