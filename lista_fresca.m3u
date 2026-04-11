@@ -1,7 +1,0 @@
-#EXTM3U
-#EXTINF:-1,Fox Sports 2
-https://98ca2.streameasthd.net/fox2ar/tracks-v1a1/mono.m3u8?ip=172.184.209.144&token=938ccec98d94b4f312c19c067090b85a4ef84a48-c1-1775992747-1775938747
-#EXTINF:-1,TNT Sports
-https://98ca2.streameasthd.net/tntsports/tracks-v1a1/mono.m3u8?ip=172.184.209.144&token=6b3f1f2d79908df4e30e2f3fea98cbd80bc24656-06-1775992772-1775938772
-#EXTINF:-1,ESPN Premium
-https://doc1.streameasthd.net/espnpremium/tracks-v1a1/mono.m3u8?ip=172.184.209.144&token=e27432bdcfe95cacd45ceba54e508bb03391abba-0f-1775992797-1775938797
