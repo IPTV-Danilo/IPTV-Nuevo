@@ -1,4 +1,4 @@
-name: Proxy Argentina Auto
+name: IPTV Argentina Auto
 
 on:
   schedule:
@@ -28,10 +28,10 @@ jobs:
       - name: Ejecutar script
         run: python cazador.py || true
 
-      - name: Guardar cambios
+      - name: Guardar lista
         run: |
           git config --global user.name "Daniel-Bot"
           git config --global user.email "bot@github.com"
           git add lista_fresca.m3u
-          git diff --cached --quiet || git commit -m "Update lista proxies"
+          git diff --cached --quiet || git commit -m "Update lista IPTV"
           git push
