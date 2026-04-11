@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 # =========================
-# PROXIES ARGENTINOS
+# OBTENER PROXIES
 # =========================
 def obtener_proxies():
     url = "https://www.proxynova.com/proxy-server-list/country-ar/"
@@ -13,8 +13,8 @@ def obtener_proxies():
     proxies = []
 
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, "html.parser")
+        r = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
 
         filas = soup.select("table tbody tr")
 
@@ -33,15 +33,13 @@ def obtener_proxies():
 
 
 # =========================
-# CAPTURA REAL (TEST + M3U8)
+# CAPTURA REAL
 # =========================
-def capturar_con_proxy(p, url, proxy):
+def capturar_m3u8(p, url, proxy=None):
     try:
-        print(f"🌐 Probando proxy: {proxy}")
-
         browser = p.chromium.launch(
             headless=True,
-            proxy={"server": proxy},
+            proxy={"server": proxy} if proxy else None,
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
@@ -55,41 +53,43 @@ def capturar_con_proxy(p, url, proxy):
 
         m3u8_links = []
 
+        # 🔥 capturar TODAS las requests (clave)
         context.on("response", lambda response: (
             m3u8_links.append(response.url)
             if ".m3u8" in response.url else None
         ))
 
+        print(f"🌐 Cargando {url} con proxy={proxy}")
+
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-        # activar player
+        # 🔥 activar video
         try:
-            page.click("video")
+            page.click("video", timeout=5000)
         except:
             pass
 
         try:
-            page.click("button")
+            page.click("button", timeout=5000)
         except:
             pass
 
-        page.mouse.move(200, 200)
+        page.mouse.move(300, 300)
 
-        time.sleep(20)
+        # 🔥 esperar más tiempo (CLAVE)
+        time.sleep(30)
 
         browser.close()
 
         # devolver último válido
         for link in reversed(m3u8_links):
-            if ".m3u8" in link and "token" in link:
-                print(f"✅ Proxy FUNCIONA: {proxy}")
+            if ".m3u8" in link:
                 return link
 
-        print(f"❌ Proxy no sirve para stream: {proxy}")
         return None
 
     except Exception as e:
-        print(f"❌ Error proxy {proxy}: {e}")
+        print(f"Error con proxy {proxy}: {e}")
         return None
 
 
@@ -113,25 +113,33 @@ def main():
 
             for nombre, url in canales.items():
 
-                print(f"\n🎯 Buscando stream para {nombre}")
+                print(f"\n🎯 Buscando {nombre}")
 
                 link_final = None
 
-                # 🔥 probar varios proxies (clave)
-                for proxy in proxies[:30]:
-                    link = capturar_con_proxy(p, url, proxy)
+                # 🔥 PROBAR VARIOS PROXIES
+                for proxy in proxies[:40]:
+                    link = capturar_m3u8(p, url, proxy)
 
                     if link:
+                        print(f"✅ Proxy FUNCIONA: {proxy}")
                         link_final = link
                         break
+                    else:
+                        print(f"❌ Proxy no sirve")
+
+                # 🔥 FALLBACK SIN PROXY (IMPORTANTE)
+                if not link_final:
+                    print("⚠️ Probando sin proxy...")
+                    link_final = capturar_m3u8(p, url, None)
 
                 if link_final:
                     f.write(f"#EXTINF:-1,{nombre}\n{link_final}\n")
                     print(f"✅ {nombre} OK")
                 else:
-                    print(f"❌ {nombre} no encontrado con proxies")
+                    print(f"❌ {nombre} NO encontrado")
 
-    print("\n✅ PROCESO TERMINADO")
+    print("\n✅ FIN")
 
 
 if __name__ == "__main__":
