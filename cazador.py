@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 # =========================
-# OBTENER PROXIES
+# OBTENER PROXIES DE ARGENTINA
 # =========================
 def obtener_proxies():
     url = "https://www.proxynova.com/proxy-server-list/country-ar/"
@@ -33,13 +33,37 @@ def obtener_proxies():
 
 
 # =========================
-# CAPTURA REAL
+# VERIFICAR QUE EL PROXY SEA ARGENTINA REAL
 # =========================
-def capturar_m3u8(p, url, proxy=None):
+def validar_proxy_argentina(proxy):
+    try:
+        r = requests.get(
+            "http://ip-api.com/json",
+            proxies={"http": proxy, "https": proxy},
+            timeout=6
+        )
+        data = r.json()
+
+        if data.get("country") == "Argentina":
+            print(f"🇦🇷 Proxy AR válido: {proxy}")
+            return True
+        else:
+            print(f"🌎 Proxy NO AR ({data.get('country')}): {proxy}")
+            return False
+
+    except:
+        print(f"❌ Proxy muerto: {proxy}")
+        return False
+
+
+# =========================
+# CAPTURAR M3U8
+# =========================
+def capturar_m3u8(p, url, proxy):
     try:
         browser = p.chromium.launch(
             headless=True,
-            proxy={"server": proxy} if proxy else None,
+            proxy={"server": proxy},
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
@@ -53,17 +77,15 @@ def capturar_m3u8(p, url, proxy=None):
 
         m3u8_links = []
 
-        # 🔥 capturar TODAS las requests (clave)
         context.on("response", lambda response: (
             m3u8_links.append(response.url)
             if ".m3u8" in response.url else None
         ))
 
-        print(f"🌐 Cargando {url} con proxy={proxy}")
+        print(f"🎬 Cargando stream con proxy AR: {proxy}")
 
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-        # 🔥 activar video
         try:
             page.click("video", timeout=5000)
         except:
@@ -74,14 +96,12 @@ def capturar_m3u8(p, url, proxy=None):
         except:
             pass
 
-        page.mouse.move(300, 300)
+        page.mouse.move(200, 200)
 
-        # 🔥 esperar más tiempo (CLAVE)
-        time.sleep(30)
+        time.sleep(25)
 
         browser.close()
 
-        # devolver último válido
         for link in reversed(m3u8_links):
             if ".m3u8" in link:
                 return link
@@ -89,7 +109,7 @@ def capturar_m3u8(p, url, proxy=None):
         return None
 
     except Exception as e:
-        print(f"Error con proxy {proxy}: {e}")
+        print(f"Error capturando con proxy {proxy}: {e}")
         return None
 
 
@@ -117,27 +137,26 @@ def main():
 
                 link_final = None
 
-                # 🔥 PROBAR VARIOS PROXIES
-                for proxy in proxies[:40]:
+                # 🔥 SOLO PROXIES ARGENTINA REALES
+                for proxy in proxies[:50]:
+
+                    if not validar_proxy_argentina(proxy):
+                        continue
+
                     link = capturar_m3u8(p, url, proxy)
 
                     if link:
-                        print(f"✅ Proxy FUNCIONA: {proxy}")
+                        print(f"✅ FUNCIONÓ con proxy AR: {proxy}")
                         link_final = link
                         break
                     else:
-                        print(f"❌ Proxy no sirve")
-
-                # 🔥 FALLBACK SIN PROXY (IMPORTANTE)
-                if not link_final:
-                    print("⚠️ Probando sin proxy...")
-                    link_final = capturar_m3u8(p, url, None)
+                        print("❌ No sirvió para stream")
 
                 if link_final:
                     f.write(f"#EXTINF:-1,{nombre}\n{link_final}\n")
                     print(f"✅ {nombre} OK")
                 else:
-                    print(f"❌ {nombre} NO encontrado")
+                    print(f"❌ {nombre} no encontrado con proxies AR")
 
     print("\n✅ FIN")
 
