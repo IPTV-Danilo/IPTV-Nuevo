@@ -1,42 +1,82 @@
 import time
-import requests
-import re
+import random
 from playwright.sync_api import sync_playwright
 
-def obtener_proxies_ar():
-    """Extrae una lista de proxies de Argentina de fuentes públicas."""
-    print("🌐 Buscando proxies de Argentina actualizados...")
-    url = "https://www.proxy-list.download/api/v1/get?type=http&country=AR"
-    try:
-        response = requests.get(url, timeout=10)
-        proxies = response.text.splitlines()
-        print(f"✅ Se encontraron {len(proxies)} proxies potenciales.")
-        return proxies
-    except Exception as e:
-        print(f"❌ Error obteniendo lista de proxies: {e}")
-        return []
+PROXIES_AR = [
+    "181.209.79.130:4145",
+    "190.105.215.154:999",
+    "181.118.151.106:8080"
+]
 
-def capturar_link(browser_context, url):
-    page = browser_context.new_page()
+def capturar_link(context, url):
+    page = context.new_page()
     m3u8_url = None
 
     def handle_response(response):
         nonlocal m3u8_url
-        # Buscamos el link maestro (que no tenga 'tracks' o 'segment')
-        if ".m3u8" in response.url and "tracks" not in response.url:
-            m3u8_url = response.url
+        try:
+            if ".m3u8" in response.url:
+                print(f"🎯 Detectado: {response.url}")
+                m3u8_url = response.url
+        except:
+            pass
 
     page.on("response", handle_response)
 
     try:
-        print(f"🔗 Navegando a: {url}")
-        page.goto(url, wait_until="networkidle", timeout=60000)
-        time.sleep(15) # Tiempo para que el player dispare el link
+        print(f"🔗 Entrando a: {url}")
+        page.goto(url, timeout=90000)
+
+        # 🔥 CLAVE: esperar a que cargue todo el JS
+        page.wait_for_timeout(20000)
+
+        # 🔥 CLAVE: intentar interacción (muchos players requieren click)
+        try:
+            page.mouse.click(300, 300)
+            print("🖱️ Click forzado en el player")
+        except:
+            pass
+
+        # Espera extra para que dispare requests del video
+        page.wait_for_timeout(15000)
+
     except Exception as e:
-        print(f"⚠️ Error en la página: {e}")
+        print(f"⚠️ Error: {e}")
+
     finally:
         page.close()
+
     return m3u8_url
+
+
+def probar_con_proxy(proxy, canales):
+    print(f"\n🌐 Probando proxy: {proxy}")
+
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(
+                headless=True,
+                proxy={"server": f"http://{proxy}"}
+            )
+
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"
+            )
+
+            resultados = {}
+
+            for nombre, url in canales.items():
+                print(f"\n🔍 Buscando {nombre}")
+                link = capturar_link(context, url)
+                resultados[nombre] = link
+
+            browser.close()
+            return resultados
+
+        except Exception as e:
+            print(f"🚫 Proxy muerto: {e}")
+            return None
+
 
 def main():
     canales = {
@@ -45,49 +85,31 @@ def main():
         "ESPN Premium": "https://streamtpnew.com/global1.php?stream=espnpremium"
     }
 
-    proxies = obtener_proxies_ar()
-    lista_final = []
+    random.shuffle(PROXIES_AR)
 
-    with sync_playwright() as p:
-        exito = False
-        
-        # Intentamos con los primeros 5 proxies de la lista hasta que uno funcione
-        for proxy_ip in proxies[:5]:
-            print(f"🚀 Probando con proxy: {proxy_ip}")
-            try:
-                browser = p.chromium.launch(
-                    headless=True,
-                    proxy={"server": f"http://{proxy_ip}"}
-                )
-                context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0")
-                
-                temp_links = []
-                for nombre, url in canales.items():
-                    print(f"🔍 Buscando {nombre}...")
-                    link = capturar_link(context, url)
-                    if link:
-                        temp_links.append((nombre, link))
-                        print(f"✅ {nombre} capturado!")
-                
-                if temp_links:
-                    lista_final = temp_links
-                    exito = True
-                    browser.close()
-                    break # Si funcionó, dejamos de probar proxies
-                
-                browser.close()
-            except Exception as e:
-                print(f"❌ Proxy {proxy_ip} falló o es muy lento. Reintentando...")
+    resultados_finales = None
 
-        # Guardar resultados
-        with open("lista_fresca.m3u", "w") as f:
-            f.write("#EXTM3U\n")
-            if lista_final:
-                for nombre, link in lista_final:
-                    f.write(f"#EXTINF:-1, {nombre}\n{link}\n")
-                print("💾 Lista guardada con éxito.")
-            else:
-                print("EOF: No se pudo obtener ningún link con los proxies actuales.")
+    for proxy in PROXIES_AR:
+        resultados = probar_con_proxy(proxy, canales)
+
+        if resultados and any(resultados.values()):
+            print("✅ Proxy funcional encontrado")
+            resultados_finales = resultados
+            break
+
+    # Guardar archivo
+    with open("lista_fresca.m3u", "w") as f:
+        f.write("#EXTM3U\n")
+
+        if resultados_finales:
+            for nombre, link in resultados_finales.items():
+                if link:
+                    f.write(f"#EXTINF:-1,{nombre}\n{link}\n")
+                    print(f"✅ {nombre} agregado")
+                else:
+                    print(f"❌ {nombre} sin link")
+        else:
+            print("🚫 Ningún proxy funcionó")
 
 if __name__ == "__main__":
     main()
