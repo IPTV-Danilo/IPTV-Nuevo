@@ -1,26 +1,31 @@
-import os
-import re
 import time
 from playwright.sync_api import sync_playwright
 
 def capturar_link(browser, url):
     page = browser.new_page()
+    m3u8_url = None
+
+    def handle_response(response):
+        nonlocal m3u8_url
+        if ".m3u8" in response.url:
+            print(f"🎯 Detectado: {response.url}")
+            m3u8_url = response.url
+
+    page.on("response", handle_response)
+
     try:
-        # Entramos a la web
         page.goto(url, wait_until="networkidle", timeout=60000)
-        # Esperamos 10 segundos a que el reproductor genere el link
-        time.sleep(10)
-        content = page.content()
-        
-        # Buscamos el link .m3u8
-        match = re.search(r'(https?://[^\s\'"]+\.m3u8[^\s\'"]*)', content)
-        if match:
-            return match.group(1).replace('\\', '')
+
+        # Esperamos a que cargue el reproductor
+        time.sleep(20)
+
     except Exception as e:
-        print(f"Error en {url}: {e}")
+        print(f"❌ Error en {url}: {e}")
     finally:
         page.close()
-    return None
+
+    return m3u8_url
+
 
 def main():
     canales = {
@@ -30,18 +35,27 @@ def main():
     }
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        with open("lista_fresca.m3u", "w") as f:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"]
+        )
+
+        with open("lista_fresca.m3u", "w", encoding="utf-8") as f:
             f.write("#EXTM3U\n")
+
             for nombre, url in canales.items():
-                print(f"Buscando {nombre}...")
+                print(f"🔍 Buscando {nombre}...")
+
                 link = capturar_link(browser, url)
+
                 if link:
-                    f.write(f"#EXTINF:-1, {nombre}\n{link}\n")
-                    print(f"✅ {nombre} OK")
+                    f.write(f"#EXTINF:-1,{nombre}\n{link}\n")
+                    print(f"✅ {nombre} OK\n")
                 else:
-                    print(f"❌ {nombre} no encontrado")
+                    print(f"❌ {nombre} NO encontrado\n")
+
         browser.close()
+
 
 if __name__ == "__main__":
     main()
