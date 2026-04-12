@@ -1,4 +1,4 @@
-name: IPTV Argentina Auto
+name: IPTV Argentina Seguro
 
 on:
   schedule:
@@ -18,20 +18,20 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Instalar dependencias
         run: |
           pip install -r requirements.txt
           playwright install
           playwright install chromium
           playwright install-deps
 
-      - name: Run script
+      - name: Ejecutar script
         run: python cazador.py || true
 
-      - name: Commit results
+      - name: Guardar lista
         run: |
           git config --global user.name "Daniel-Bot"
           git config --global user.email "bot@github.com"
           git add lista_fresca.m3u
-          git diff --cached --quiet || git commit -m "Update lista IPTV"
+          git diff --cached --quiet || git commit -m "Update IPTV Argentina"
           git push
