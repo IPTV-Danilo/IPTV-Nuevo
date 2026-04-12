@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 # =========================
-# OBTENER PROXIES ARGENTINOS
+# OBTENER PROXIES
 # =========================
 def obtener_proxies():
     url = "https://www.proxynova.com/proxy-server-list/country-ar/"
@@ -32,29 +32,13 @@ def obtener_proxies():
 
 
 # =========================
-# VERIFICAR SI ES ARGENTINA
+# CAPTURAR M3U8
 # =========================
-def es_argentina(proxy):
-    try:
-        r = requests.get(
-            "http://ip-api.com/json",
-            proxies={"http": proxy, "https": proxy},
-            timeout=5
-        )
-        data = r.json()
-        return data.get("country") == "Argentina"
-    except:
-        return False
-
-
-# =========================
-# CAPTURAR LINK M3U8
-# =========================
-def capturar_m3u8(p, url, proxy):
+def capturar_m3u8(p, url, proxy=None):
     try:
         browser = p.chromium.launch(
             headless=True,
-            proxy={"server": proxy},
+            proxy={"server": proxy} if proxy else None,
             args=[
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
@@ -71,15 +55,16 @@ def capturar_m3u8(p, url, proxy):
         def handle_response(response):
             nonlocal m3u8_link
             if ".m3u8" in response.url:
-                print("🎯 M3U8 detectado")
+                print(f"🎯 Detectado: {response.url}")
                 m3u8_link = response.url
 
         context.on("response", handle_response)
 
-        print(f"🌐 Cargando con proxy: {proxy}")
+        print(f"🌐 Cargando {url} con proxy={proxy}")
+
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-        # intentar activar el video
+        # activar player
         for _ in range(3):
             try:
                 page.click("video", timeout=2000)
@@ -90,6 +75,8 @@ def capturar_m3u8(p, url, proxy):
                 page.click("button", timeout=2000)
             except:
                 pass
+
+            page.mouse.move(300, 300)
 
         # espera inteligente
         start = time.time()
@@ -125,30 +112,32 @@ def main():
             f.write("#EXTM3U\n")
 
             for nombre, url in canales.items():
+
                 print(f"\n🎯 Buscando {nombre}")
 
                 link_final = None
 
-                for proxy in proxies[:50]:
-                    print(f"🌐 Probando proxy: {proxy}")
-
+                # 🔥 probar proxies
+                for proxy in proxies[:40]:
                     link = capturar_m3u8(p, url, proxy)
 
                     if link:
-                        print("🎯 Link encontrado, verificando país...")
+                        print(f"✅ FUNCIONA con proxy: {proxy}")
+                        link_final = link
+                        break
+                    else:
+                        print("❌ Proxy no sirve")
 
-                        if es_argentina(proxy):
-                            print("🇦🇷 Proxy válido (Argentina)")
-                            link_final = link
-                            break
-                        else:
-                            print("🌎 No es Argentina → descartado")
+                # 🔥 fallback SIN proxy (clave)
+                if not link_final:
+                    print("⚠️ Probando sin proxy...")
+                    link_final = capturar_m3u8(p, url, None)
 
                 if link_final:
                     f.write(f"#EXTINF:-1,{nombre}\n{link_final}\n")
                     print(f"✅ {nombre} OK")
                 else:
-                    print(f"❌ {nombre} no encontrado")
+                    print(f"❌ {nombre} NO encontrado")
 
     print("\n✅ PROCESO TERMINADO")
 
