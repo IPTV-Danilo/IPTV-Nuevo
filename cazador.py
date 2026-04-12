@@ -31,7 +31,7 @@ def obtener_proxies():
 
 
 # =========================
-# VERIFICAR IP REAL DESDE NAVEGADOR
+# VERIFICAR IP ARGENTINA (REAL)
 # =========================
 def verificar_ip_argentina(p, proxy):
     try:
@@ -49,10 +49,10 @@ def verificar_ip_argentina(p, proxy):
         browser.close()
 
         if "Argentina" in data:
-            print(f"🇦🇷 IP Argentina confirmada: {proxy}")
+            print(f"🇦🇷 Proxy AR verificado: {proxy}")
             return True
         else:
-            print(f"🌎 Proxy no es AR: {proxy}")
+            print(f"🌎 No AR: {proxy}")
             return False
 
     except:
@@ -91,7 +91,7 @@ def capturar_m3u8(p, url, proxy):
 
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-        # intentar activar player
+        # intentar activar el player
         for _ in range(3):
             try:
                 page.click("video", timeout=2000)
@@ -141,26 +141,44 @@ def main():
 
                 link_final = None
 
-                for proxy in proxies[:50]:
+                # =========================
+                # FASE 1: PROXIES AR VERIFICADOS
+                # =========================
+                print("🇦🇷 Fase 1: proxies verificados")
 
-                    # 🔥 verificar que sea Argentina REAL
+                for proxy in proxies[:30]:
                     if not verificar_ip_argentina(p, proxy):
                         continue
 
                     link = capturar_m3u8(p, url, proxy)
 
                     if link:
-                        print(f"✅ FUNCIONA con proxy AR: {proxy}")
+                        print(f"✅ FUNCIONA AR verificado: {proxy}")
                         link_final = link
                         break
-                    else:
-                        print("❌ Proxy no sirve para stream")
 
+                # =========================
+                # FASE 2: PROXIES SIN VALIDAR
+                # =========================
+                if not link_final:
+                    print("⚠️ Fase 2: proxies sin validar")
+
+                    for proxy in proxies[:30]:
+                        link = capturar_m3u8(p, url, proxy)
+
+                        if link:
+                            print(f"✅ FUNCIONA sin validar: {proxy}")
+                            link_final = link
+                            break
+
+                # =========================
+                # RESULTADO FINAL
+                # =========================
                 if link_final:
                     f.write(f"#EXTINF:-1,{nombre}\n{link_final}\n")
                     print(f"✅ {nombre} OK")
                 else:
-                    print(f"❌ {nombre} no encontrado con IP Argentina")
+                    print(f"❌ {nombre} no encontrado")
 
     print("\n✅ FINALIZADO")
 
