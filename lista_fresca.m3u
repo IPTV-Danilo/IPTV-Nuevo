@@ -1,3 +1,5 @@
 #EXTM3U
+#EXTINF:-1,TNT Sports
+https://doc1.streameasthd.net/tntsports/tracks-v1a1/mono.m3u8?ip=157.55.189.20&token=cbc1eb6939f716cbff2c537469863059276aee0e-b1-1780746470-1780692470
 #EXTINF:-1,ESPN Premium
-https://8c51.streameasthd.net/espnpremium/tracks-v1a1/mono.m3u8?ip=172.182.192.149&token=b6b02c71f5ce9c8b28b1b374db1b2131143521d0-4b-1780740688-1780686688
+https://98ca2.streameasthd.net/espnpremium/tracks-v1a1/mono.m3u8?ip=157.55.189.20&token=8faa23072339801850a1bc8a97f0f5de6cb4c4e4-6f-1780746484-1780692484
